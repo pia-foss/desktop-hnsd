@@ -1,0 +1,155 @@
+#! /usr/bin/env bash
+
+set -e
+
+__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+__file="${__dir}/$(basename "${BASH_SOURCE[0]}")"
+__base="$(basename "${__file}" .sh)"
+
+die() { echo "${__base}:" "$*" 1>&2 ; exit 1; }
+
+# Set platform based on the host platform
+case "$(uname)" in
+    Linux)
+        case "$(uname -m)" in
+            x86)
+                platform=linux32
+                openssl_platform=linux-elf
+                # Note - might want to set minimum CPU here; see OpenSSL's `config`
+                ;;
+            x86_64)
+                platform=linux64
+                openssl_platform=linux-x86_64
+                ;;
+            *) die "Unsupported Linux architecture" ;;
+        esac
+        ;;
+    Darwin)
+        platform=macos
+        openssl_platform=darwin64-x86_64-cc
+        ;;
+    MINGW64_NT*)
+        platform=mingw64
+        openssl_platform=mingw64
+        # unbound's configure.ac checks for uname=MINGW32, but not MINGW64.
+        # Pass --host and --build so it still detects MinGW.
+        unbound_platform_cfgargs="--host=${MINGW_CHOST} --build=${MINGW_CHOST}"
+        ;;
+    MINGW32_NT*)
+        platform=mingw
+        openssl_platform=mingw
+        # In addition to the host/build tweak, MinGW32 is missing
+        # lib/bfd-plugins/liblto_plugin-0.dll, use gcc-ar and gcc-ranlib instead
+        # which know to load that plugin from the gcc lib directory
+        unbound_platform_cfgargs="--host=${MINGW_CHOST} --build=${MINGW_CHOST} AR=gcc-ar RANLIB=gcc-ranlib"
+        ;;
+    *)
+        die "Unsupported host platform"
+        ;;
+esac
+
+output_dir="${__dir}/out/build/${platform}"
+artifacts_dir="${__dir}/out/artifacts/${platform}"
+build_dir="${__dir}/build.tmp"
+
+# For quick iterations on the build script itself, setting REBUILD skips the
+# clean and clone steps for build dirs that already exist.  It does _not_ make
+# sure existing build directories are up to date with the submodules, though.
+if [ -z "${REBUILD}" ]; then
+    rm -rf "${output_dir}" "${artifacts_dir}" "${build_dir}"
+fi
+
+rm -rf "${output_dir}"
+
+mkdir -p "${output_dir}"
+mkdir -p "${artifacts_dir}"
+mkdir -p "${build_dir}"
+
+# Local changes would be ignored due to clones below; make sure submodules are clean
+check_submodule_clean() {
+    git -C "./$1" diff-index --quiet HEAD -- || die "$1 submodule is not clean, commit or revert changes before building"
+}
+check_submodule_clean openssl
+check_submodule_clean unbound
+check_submodule_clean hnsd
+
+# Create a build directory for a submodule by cloning it, and apply patches if
+# present
+prep_submodule() {
+    local module_build_dir="${build_dir}/$1"
+
+    # For normal full builds, always do the clone.  For rebuilds, do the clone
+    # only if this build dir doesn't exist yet.
+    if [ -z "${REBUILD}" ] || [ ! -d "${module_build_dir}" ]; then
+        git clone "./$1" "${module_build_dir}" || die "Could not create build directory for $1"
+
+        for p in "${__dir}/patch-$1"/*.patch; do
+            [ -f "$p" ] || continue # empty patch dir
+            echo "+ Applying $p..."
+            git -C "${module_build_dir}" am "$p"
+        done
+    fi
+}
+
+prep_submodule openssl
+prep_submodule unbound
+prep_submodule hnsd
+
+echo "Building OpenSSL..."
+pushd "${build_dir}/openssl"
+./Configure $openssl_platform
+make -j2
+# The install_sw target skips man pages
+make INSTALL_PREFIX="${output_dir}/openssl" install_sw
+popd
+
+echo "Building Unbound..."
+pushd "${build_dir}/unbound"
+# Rerun autoconf due to change to configure.ac
+autoconf
+# Configure options
+# - Use OpenSSL built above
+# - Just build libunbound, skip unbound, unbound-anchor, etc.
+# - Don't build shared objects (just build static libraries)
+# - Always install to /usr/local prefix (default is different on MinGW)
+# shellcheck disable=SC2086
+# ^ Intentional wordsplitting of ${unbound_platform_cfgargs}
+./configure --with-ssl="${output_dir}/openssl/usr/local/ssl" --with-libunbound-only --disable-shared --enable-static ${unbound_platform_cfgargs} --prefix="${output_dir}/unbound" --disable-flto
+make -j2
+make install
+popd
+
+echo "Building hnsd..."
+pushd "${build_dir}/hnsd"
+./autogen.sh
+# mainnet does not exist yet.  testnet is currently the default.  We'll almost
+# certainly switch to mainnet at our first chance, but we don't want the rug
+# pulled out from under us.
+./configure --with-network=testnet --with-unbound="${output_dir}/unbound"
+make -j2
+
+# Copy hnsd to artifacts
+cp "${build_dir}/hnsd/hnsd" "${artifacts_dir}/pia-hnsd"
+
+function strip_symbols() {
+    local EXT=$1
+
+    # Strip debugging symbols from hnsd, but keep a full copy in case it's
+    # needed for debugging
+    cp "${artifacts_dir}/pia-hnsd${EXT}" "${artifacts_dir}/pia-hnsd.full${EXT}"
+    strip --strip-debug "${artifacts_dir}/pia-hnsd${EXT}"
+    objcopy --add-gnu-debuglink="${artifacts_dir}/pia-hnsd.full${EXT}" "${artifacts_dir}/pia-hnsd${EXT}"
+}
+
+case $platform in
+    linux*)
+        strip_symbols
+        ;;
+    mingw*)
+        strip_symbols ".exe"
+        ;;
+    macos)
+        ;;
+esac
+
+popd

@@ -1,0 +1,9 @@
+[submodule "openssl"]
+	path = openssl
+	url = https://github.com/openssl/openssl
+[submodule "unbound"]
+	path = unbound
+	url = https://github.com/NLnetLabs/unbound
+[submodule "hnsd"]
+	path = hnsd
+	url = https://github.com/handshake-org/hnsd
