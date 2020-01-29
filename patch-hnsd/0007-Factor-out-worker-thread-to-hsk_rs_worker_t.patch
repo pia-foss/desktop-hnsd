@@ -1,14 +1,14 @@
-From 28c2f817a4994251a57f767b9043104ce87d88fc Mon Sep 17 00:00:00 2001
+From 3f3c0a1d746ddec0ffc151a0c24e73d377c08a28 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Thu, 9 May 2019 10:34:02 -0400
-Subject: [PATCH 06/12] Factor out worker thread to hsk_rs_worker_t
+Subject: [PATCH 07/14] Factor out worker thread to hsk_rs_worker_t
 
 ---
  Makefile.am     |   3 +-
- src/rs.c        | 254 +++--------------------------------
- src/rs.h        |  21 +--
- src/rs_worker.c | 347 ++++++++++++++++++++++++++++++++++++++++++++++++
- src/rs_worker.h |  84 ++++++++++++
+ src/rs.c        | 254 +++--------------------------------------
+ src/rs.h        |  21 +---
+ src/rs_worker.c | 347 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ src/rs_worker.h |  84 ++++++++++++++
  5 files changed, 452 insertions(+), 257 deletions(-)
  create mode 100644 src/rs_worker.c
  create mode 100644 src/rs_worker.h
@@ -875,5 +875,5 @@ index 0000000..3e4c16b
 +
 +#endif
 -- 
-2.17.1
+2.7.4
 

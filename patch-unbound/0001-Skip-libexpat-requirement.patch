@@ -1,7 +1,7 @@
-From cd5bc003ec3eab342767fb2ef1aede88d3300801 Mon Sep 17 00:00:00 2001
+From 56e5eeba1aff85d6c7e6c14a0c52c81163165e2e Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Thu, 2 May 2019 16:40:00 -0400
-Subject: [PATCH] Skip libexpat requirement
+Subject: [PATCH 1/2] Skip libexpat requirement
 
 Skip libexpat; not needed when only building libunbound
 ---
@@ -26,5 +26,5 @@ index ff6f05ad..cd0803ec 100644
  AC_CHECK_DECLS([XML_StopParser], [], [], [AC_INCLUDES_DEFAULT
  #include <expat.h>
 -- 
-2.17.1
+2.23.0
 

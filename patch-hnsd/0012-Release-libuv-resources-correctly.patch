@@ -1,7 +1,7 @@
-From 994cc67d4bd0ef9e8e192f9e8f69c248e5eb1c03 Mon Sep 17 00:00:00 2001
+From 2307adb1ef8e01540836996a2306f5a0a6b41bc4 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Tue, 21 May 2019 11:26:09 -0400
-Subject: [PATCH 11/12] Release libuv resources correctly
+Subject: [PATCH 12/14] Release libuv resources correctly
 
 ---
  src/ns.c   | 45 +++++++++++++++++++++++----------------------
@@ -130,16 +130,16 @@ index 1643201..6c3f694 100644
  
    if (status != 0) {
      hsk_ns_log(ns, "failed sending: %s\n", uv_strerror(status));
-@@ -601,9 +605,6 @@ after_recv(
-   );
+@@ -602,9 +606,6 @@ after_recv(
  }
  
--static void
+ static void
 -after_close(uv_handle_t *handle) {}
 -
- static void
+-static void
  after_resolve(
    const char *name,
+   int status,
 diff --git a/src/ns.h b/src/ns.h
 index 27d3317..b9d1797 100644
 --- a/src/ns.h
@@ -368,5 +368,5 @@ index 4fbd774..cb8e1bc 100644
    void *stop_data;
    void (*stop_callback)(void *);
 -- 
-2.17.1
+2.7.4
 

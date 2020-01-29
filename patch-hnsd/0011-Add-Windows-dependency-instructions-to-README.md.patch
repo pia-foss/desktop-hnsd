@@ -1,7 +1,7 @@
-From 500b7f10212ad08f4b7bfbd25e345a738a0ee1e7 Mon Sep 17 00:00:00 2001
+From 28df99eb283fa30247fee763850d60c1b11a54bd Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 10 May 2019 15:34:20 -0400
-Subject: [PATCH 10/12] Add Windows dependency instructions to README.md
+Subject: [PATCH 11/14] Add Windows dependency instructions to README.md
 
 ---
  README.md | 17 +++++++++++++++++
@@ -36,5 +36,5 @@ index be0e88f..8958549 100644
  
  ``` sh
 -- 
-2.17.1
+2.7.4
 

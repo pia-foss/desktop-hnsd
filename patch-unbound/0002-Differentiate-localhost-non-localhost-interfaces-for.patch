@@ -1,0 +1,201 @@
+From 7e31c6f33225ec369aa4c515f1293acfb1d0fa67 Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jhall@londontrustmedia.com>
+Date: Thu, 19 Dec 2019 11:27:52 -0500
+Subject: [PATCH 2/2] Differentiate localhost / non-localhost interfaces for
+ IPv4 UDP sends
+
+---
+ services/outside_network.c | 83 +++++++++++++++++++++++++++++++++++---
+ services/outside_network.h |  8 ++++
+ util/net_help.c            | 14 +++++++
+ util/net_help.h            |  8 ++++
+ 4 files changed, 108 insertions(+), 5 deletions(-)
+
+diff --git a/services/outside_network.c b/services/outside_network.c
+index 16d63df4..1df13dbb 100644
+--- a/services/outside_network.c
++++ b/services/outside_network.c
+@@ -735,6 +735,23 @@ static int setup_if(struct port_if* pif, const char* addrstr,
+ 	return 1;
+ }
+ 
++static int
++if4_sort_priority(const void *if4)
++{
++    const struct port_if *pif4 = (const struct port_if*)if4;
++    if(addr_is_ip4_localhost(&pif4->addr, pif4->addrlen))
++        return 0;
++    if(addr_is_any(&pif4->addr, pif4->addrlen))
++        return 1;
++    return 2;
++}
++
++static int
++if4_sort_comp(const void *first, const void *second)
++{
++    return if4_sort_priority(first) - if4_sort_priority(second);
++}
++
+ struct outside_network* 
+ outside_network_create(struct comm_base *base, size_t bufsize, 
+ 	size_t num_ports, char** ifs, int num_ifs, int do_ip4, 
+@@ -842,6 +859,14 @@ outside_network_create(struct comm_base *base, size_t bufsize,
+ 			outside_network_delete(outnet);
+ 			return NULL;
+ 		}
++                if(do_ip4) {
++                    // Use the single 'any' interface for local or non-local
++                    // queries
++                    outnet->ip4_localhost_ifs_offset = 0;
++                    outnet->num_ip4_localhost_ifs = 1;
++                    outnet->ip4_nonlocalhost_ifs_offset = 0;
++                    outnet->num_ip4_nonlocalhost_ifs = 1;
++                }
+ 		if(do_ip6 && !setup_if(&outnet->ip6_ifs[0], "::", 
+ 			availports, numavailports, num_ports)) {
+ 			log_err("malloc failed");
+@@ -871,6 +896,39 @@ outside_network_create(struct comm_base *base, size_t bufsize,
+ 				done_4++;
+ 			}
+ 		}
++                // Partition IPv4 interfaces this way so we have contiguous
++                // slices for localhost and non-localhost interfaces (including
++                // allowing 'any' to be in both)
++                // - localhost
++                // - any
++                // - others
++                qsort(outnet->ip4_ifs, done_4, sizeof(struct port_if), &if4_sort_comp);
++                int partition = 0;
++                char addr[32];
++                // Find end of 'localhost'
++                for(; partition<done_4; ++partition) {
++                    if(!addr_is_ip4_localhost(&outnet->ip4_ifs[partition].addr, outnet->ip4_ifs[partition].addrlen))
++                        break;
++                    addr_to_str(&outnet->ip4_ifs[partition].addr, outnet->ip4_ifs[partition].addrlen, addr, 32);
++                    verbose(VERB_ALGO, "localhost: %s", addr);
++                }
++                // Nonlocal starts here
++                outnet->ip4_nonlocalhost_ifs_offset = partition;
++                // Find end of 'any'
++                for(; partition<done_4; ++partition) {
++                    if(!addr_is_any(&outnet->ip4_ifs[partition].addr, outnet->ip4_ifs[partition].addrlen))
++                        break;
++                    addr_to_str(&outnet->ip4_ifs[partition].addr, outnet->ip4_ifs[partition].addrlen, addr, 32);
++                    verbose(VERB_ALGO, "any: %s", addr);
++                }
++                // Local ends here (started at 0)
++                outnet->num_ip4_localhost_ifs = partition;
++                // Others end at end of array
++                outnet->num_ip4_nonlocalhost_ifs = done_4 - outnet->ip4_nonlocalhost_ifs_offset;
++                for(; partition<done_4; ++partition) {
++                    addr_to_str(&outnet->ip4_ifs[partition].addr, outnet->ip4_ifs[partition].addrlen, addr, 32);
++                    verbose(VERB_ALGO, "other: %s", addr);
++                }
+ 	}
+ 	return outnet;
+ }
+@@ -1113,6 +1171,14 @@ static int
+ select_ifport(struct outside_network* outnet, struct pending* pend,
+ 	int num_if, struct port_if* ifs)
+ {
++    char addr[32];
++    addr_to_str(&pend->addr, pend->addrlen, addr, 32);
++    printf("select interface for %s from (%d)\n", addr, num_if);
++    for(int i=0; i<num_if; ++i)
++    {
++        addr_to_str(&ifs[i].addr, ifs[i].addrlen, addr, 32);
++        printf(" %d: %s\n", i, addr);
++    }
+ 	int my_if, my_port, fd, portno, inuse, tries=0;
+ 	struct port_if* pif;
+ 	/* randomly select interface and port */
+@@ -1195,11 +1261,18 @@ randomize_and_send_udp(struct pending* pend, sldns_buffer* packet, int timeout)
+ 		if(!select_ifport(outnet, pend, 
+ 			outnet->num_ip6, outnet->ip6_ifs))
+ 			return 0;
+-	} else {
+-		if(!select_ifport(outnet, pend, 
+-			outnet->num_ip4, outnet->ip4_ifs))
+-			return 0;
+-	}
++        } else if(addr_is_ip4_localhost(&pend->addr, pend->addrlen)) {
++            // Localhost query
++                if(!select_ifport(outnet, pend,
++                        outnet->num_ip4_localhost_ifs, outnet->ip4_ifs + outnet->ip4_localhost_ifs_offset))
++                        return 0;
++	}
++        else {
++            // Non-localhost query
++                if(!select_ifport(outnet, pend,
++                        outnet->num_ip4_nonlocalhost_ifs, outnet->ip4_ifs + outnet->ip4_nonlocalhost_ifs_offset))
++                        return 0;
++        }
+ 	log_assert(pend->pc && pend->pc->cp);
+ 
+ 	/* send it over the commlink */
+diff --git a/services/outside_network.h b/services/outside_network.h
+index 48ef03ed..05a9db82 100644
+--- a/services/outside_network.h
++++ b/services/outside_network.h
+@@ -117,6 +117,14 @@ struct outside_network {
+ 	/** number of outgoing IP6 interfaces */
+ 	int num_ip6;
+ 
++        /** Slice of ip4_ifs for interfaces usable for localhost queries */
++        int ip4_localhost_ifs_offset;
++        int num_ip4_localhost_ifs;
++
++        /** Slice of ip4_ifs for interfaces usable for non-localhost queries */
++        int ip4_nonlocalhost_ifs_offset;
++        int num_ip4_nonlocalhost_ifs;
++
+ 	/** pending udp queries waiting to be sent out, waiting for fd */
+ 	struct pending* udp_wait_first;
+ 	/** last pending udp query in list */
+diff --git a/util/net_help.c b/util/net_help.c
+index 2b1be924..8458ceb8 100644
+--- a/util/net_help.c
++++ b/util/net_help.c
+@@ -537,6 +537,20 @@ addr_is_ip6(struct sockaddr_storage* addr, socklen_t len)
+ 	else    return 0;
+ }
+ 
++int
++addr_is_ip4_localhost(struct sockaddr_storage* addr, socklen_t len)
++{
++    struct sockaddr_in* addr4 = (struct sockaddr_in*)addr;
++    if(len == (socklen_t)sizeof(struct sockaddr_in) &&
++        addr4->sin_family == AF_INET &&
++        (ntohl(addr4->sin_addr.s_addr) & 0xFF000000) == 0x7F000000)
++    {
++        return 1;
++    }
++    else
++        return 0;
++}
++
+ void
+ addr_mask(struct sockaddr_storage* addr, socklen_t len, int net)
+ {
+diff --git a/util/net_help.h b/util/net_help.h
+index 0b197fbd..df708b3e 100644
+--- a/util/net_help.h
++++ b/util/net_help.h
+@@ -276,6 +276,14 @@ int sockaddr_cmp_addr(struct sockaddr_storage* addr1, socklen_t len1,
+  */
+ int addr_is_ip6(struct sockaddr_storage* addr, socklen_t len);
+ 
++/**
++ * Check if address is IPv4 localhost - 127.0.0.0/8
++ * @param addr: the sockaddr to examine.
++ * @param len: the length of addr.
++ * @return: true if sockaddr is 127.0.0.0/8
++ */
++int addr_is_ip4_localhost(struct sockaddr_storage* addr, socklen_t len);
++
+ /**
+  * Make sure the sockaddr ends in zeroes. For tree insertion and subsequent
+  * comparison.
+-- 
+2.23.0
+

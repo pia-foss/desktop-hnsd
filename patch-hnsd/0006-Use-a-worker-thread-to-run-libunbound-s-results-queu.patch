@@ -1,10 +1,10 @@
-From 9b7b0ed34452d12e302a5c55260a81a4ddfea7c8 Mon Sep 17 00:00:00 2001
+From c09bb3c81587c91235b70a2b2c6c221110ea1f1c Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Wed, 8 May 2019 16:38:42 -0400
-Subject: [PATCH 05/12] Use a worker thread to run libunbound's results queue
+Subject: [PATCH 06/14] Use a worker thread to run libunbound's results queue
 
 ---
- src/rs.c | 264 ++++++++++++++++++++++++++++++++++++++++++++++++-------
+ src/rs.c | 264 +++++++++++++++++++++++++++++++++++++++++++++++++++++++--------
  src/rs.h |  21 ++++-
  2 files changed, 251 insertions(+), 34 deletions(-)
 
@@ -437,5 +437,5 @@ index c2aac70..34128db 100644
  
  /*
 -- 
-2.17.1
+2.7.4
 

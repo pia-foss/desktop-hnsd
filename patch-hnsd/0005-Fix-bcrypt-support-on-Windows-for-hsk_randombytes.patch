@@ -1,7 +1,7 @@
-From ed0bfaa9f859a42f4545d02711cc46e025e4f790 Mon Sep 17 00:00:00 2001
+From 462a4ae12470c72fa3032879fe59f040a2468dc1 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Tue, 7 May 2019 13:40:59 -0400
-Subject: [PATCH 04/12] Fix bcrypt support on Windows for hsk_randombytes()
+Subject: [PATCH 05/14] Fix bcrypt support on Windows for hsk_randombytes()
 
 ---
  Makefile.am  |  3 ++-
@@ -88,5 +88,5 @@ index e827dea..90488aa 100644
  #else
  
 -- 
-2.17.1
+2.7.4
 

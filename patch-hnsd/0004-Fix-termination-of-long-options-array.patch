@@ -1,0 +1,26 @@
+From 7d9ac1175dd77993e753601cb49e1b29b21d1a58 Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jhall@londontrustmedia.com>
+Date: Fri, 20 Dec 2019 09:18:01 -0500
+Subject: [PATCH 04/14] Fix termination of long options array
+
+---
+ src/daemon.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/daemon.c b/src/daemon.c
+index 0c8b0f0..c027127 100644
+--- a/src/daemon.c
++++ b/src/daemon.c
+@@ -174,7 +174,8 @@ parse_arg(int argc, char **argv, hsk_options_t *opt) {
+ #ifndef _WIN32
+     { "daemon", no_argument, NULL, 'd' },
+ #endif
+-    { "help", no_argument, NULL, 'h' }
++    { "help", no_argument, NULL, 'h' },
++    { NULL, 0, 0, 0 }
+   };
+ 
+   int longopt_idx = -1;
+-- 
+2.7.4
+

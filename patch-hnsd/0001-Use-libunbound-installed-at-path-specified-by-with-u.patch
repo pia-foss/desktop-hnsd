@@ -1,7 +1,7 @@
-From b1daa0bff786140f91179507a2ed6810d852c631 Mon Sep 17 00:00:00 2001
+From a69201b872fe42a549fd41d625d3063dd906b8bb Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Wed, 1 May 2019 16:52:02 -0400
-Subject: [PATCH 01/12] Use libunbound installed at path specified by
+Subject: [PATCH 01/14] Use libunbound installed at path specified by
  --with-unbound
 
 ---
@@ -82,5 +82,5 @@ index 608019e..0a637e7 100644
  AM_CONDITIONAL(
    [HSK_USE_ECMULT_STATIC_PRECOMPUTATION],
 -- 
-2.17.1
+2.7.4
 

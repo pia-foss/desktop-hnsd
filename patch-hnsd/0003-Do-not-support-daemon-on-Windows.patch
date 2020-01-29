@@ -1,7 +1,7 @@
-From 50e184201b254230175c7e16d681e0510d4e2fa5 Mon Sep 17 00:00:00 2001
+From 6458876b49b349c24c739dfa216d7972a31b5ff3 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Mon, 6 May 2019 15:59:06 -0400
-Subject: [PATCH 03/12] Do not support --daemon on Windows
+Subject: [PATCH 03/14] Do not support --daemon on Windows
 
 ---
  src/daemon.c | 26 +++++++++++++++++++++++---
@@ -104,5 +104,5 @@ index 9696054..0c8b0f0 100644
    if (logfile)
      free(logfile);
 -- 
-2.17.1
+2.7.4
 

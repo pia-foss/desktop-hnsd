@@ -1,7 +1,7 @@
-From 64aaa9d2cbd6a8ecffdef83afa5981ec84d74057 Mon Sep 17 00:00:00 2001
+From f7342cd2349b81bb0edb3d39140c959c03fcd015 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Mon, 6 May 2019 15:58:12 -0400
-Subject: [PATCH 02/12] Use winsock2.h on Windows
+Subject: [PATCH 02/14] Use winsock2.h on Windows
 
 ---
  src/addr.c         |  3 +--
@@ -190,5 +190,5 @@ index 15c28c1..532b568 100644
  #include "req.h"
  #include "rs.h"
 -- 
-2.17.1
+2.7.4
 

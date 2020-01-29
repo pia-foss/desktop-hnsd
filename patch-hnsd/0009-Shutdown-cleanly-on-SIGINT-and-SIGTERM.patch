@@ -1,19 +1,19 @@
-From 0aa29e69fe7af80753fd393ad549cab6699488e5 Mon Sep 17 00:00:00 2001
+From 4e75a5e2f95d3780620f3c610c4b5513d0c9ea81 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Thu, 9 May 2019 14:44:08 -0400
-Subject: [PATCH 08/12] Shutdown cleanly on SIGINT and SIGTERM
+Subject: [PATCH 09/14] Shutdown cleanly on SIGINT and SIGTERM
 
 ---
  Makefile.am     |   3 +-
- src/daemon.c    | 240 +++++++++++++++++++++++++++++++++++-------------
- src/rs.c        |  89 ++++++++++--------
- src/rs.h        |   9 +-
- src/rs_worker.c | 210 +++++++++++++++++++++++++++++-------------
- src/rs_worker.h |  35 ++++++-
- src/signals.c   | 124 +++++++++++++++++++++++++
- src/signals.h   |  40 ++++++++
+ src/daemon.c    | 240 +++++++++++++++++++++++++++++++++++++++++---------------
+ src/rs.c        |  89 ++++++++++++---------
+ src/rs.h        |   9 ++-
+ src/rs_worker.c | 210 ++++++++++++++++++++++++++++++++++---------------
+ src/rs_worker.h |  35 ++++++++-
+ src/signals.c   | 124 +++++++++++++++++++++++++++++
+ src/signals.h   |  40 ++++++++++
  src/utils.c     |  13 +++
- src/utils.h     |   9 ++
+ src/utils.h     |   9 +++
  10 files changed, 598 insertions(+), 174 deletions(-)
  create mode 100644 src/signals.c
  create mode 100644 src/signals.h
@@ -33,7 +33,7 @@ index b820ba3..691e16b 100644
  hnsd_LDADD = $(LIB_UNBOUND)             \
               $(top_builddir)/libhsk.la
 diff --git a/src/daemon.c b/src/daemon.c
-index 0c8b0f0..b9631ee 100644
+index c027127..c476e55 100644
 --- a/src/daemon.c
 +++ b/src/daemon.c
 @@ -16,6 +16,7 @@
@@ -44,7 +44,7 @@ index 0c8b0f0..b9631ee 100644
  #include "uv.h"
  #include "platform-net.h"
  
-@@ -367,130 +368,245 @@ print_identity(const uint8_t *key) {
+@@ -368,130 +369,245 @@ print_identity(const uint8_t *key) {
  }
  
  /*
@@ -344,7 +344,7 @@ index 0c8b0f0..b9631ee 100644
      goto done;
    }
  
-@@ -505,17 +621,15 @@ main(int argc, char **argv) {
+@@ -506,17 +622,15 @@ main(int argc, char **argv) {
    }
  
  done:
@@ -373,16 +373,16 @@ diff --git a/src/rs.c b/src/rs.c
 index 44f290f..d7ba479 100644
 --- a/src/rs.c
 +++ b/src/rs.c
-@@ -52,6 +52,9 @@ hsk_rs_send(
- static void
+@@ -53,6 +53,9 @@ static void
  alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf);
  
-+static void
+ static void
 +after_worker_stop(void *data);
 +
- static void
++static void
  after_send(uv_udp_send_t *req, int status);
  
+ static void
 @@ -110,6 +113,7 @@ hsk_rs_init(hsk_rs_t *ns, const uv_loop_t *loop, const struct sockaddr *stub) {
    memset(ns->read_buffer, 0x00, sizeof(ns->read_buffer));
    ns->bound = false;
@@ -470,11 +470,10 @@ index 44f290f..d7ba479 100644
  static void
  hsk_rs_log(hsk_rs_t *ns, const char *fmt, ...) {
    printf("rs: ");
-@@ -603,6 +582,40 @@ alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf) {
-   buf->len = sizeof(ns->read_buffer);
+@@ -604,6 +583,40 @@ alloc_buffer(uv_handle_t *handle, size_t size, uv_buf_t *buf) {
  }
  
-+static void
+ static void
 +after_worker_stop(void *data) {
 +  hsk_rs_t *ns = (hsk_rs_t *)data;
 +
@@ -508,9 +507,10 @@ index 44f290f..d7ba479 100644
 +  stop_callback(stop_data);
 +}
 +
- static void
++static void
  after_send(uv_udp_send_t *req, int status) {
    hsk_send_data_t *sd = (hsk_send_data_t *)req->data;
+   hsk_rs_t *ns = sd->ns;
 diff --git a/src/rs.h b/src/rs.h
 index 05dad72..4fbd774 100644
 --- a/src/rs.h
@@ -1167,5 +1167,5 @@ index 9c52b73..9d4f11b 100644
 +
  #endif
 -- 
-2.17.1
+2.7.4
 

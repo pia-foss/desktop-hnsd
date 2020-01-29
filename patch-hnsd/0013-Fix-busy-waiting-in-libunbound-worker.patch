@@ -1,20 +1,20 @@
-From ffaab33830371115286e6f64a77db920cdb331a4 Mon Sep 17 00:00:00 2001
+From 1e51cc57388798062df5e93f70ba543f2f28f912 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Tue, 21 May 2019 11:56:48 -0400
-Subject: [PATCH 12/12] Fix busy waiting in libunbound worker
+Subject: [PATCH 13/14] Fix busy waiting in libunbound worker
 
 ---
- src/daemon.c    |   6 +
+ src/daemon.c    |   6 ++
  src/rs.c        |   8 +-
- src/rs_worker.c | 297 +++++++++++++++++++++++++++++++++++++++---------
- src/rs_worker.h |  65 ++++++++---
+ src/rs_worker.c | 297 ++++++++++++++++++++++++++++++++++++++++++++++----------
+ src/rs_worker.h |  65 ++++++++++---
  4 files changed, 307 insertions(+), 69 deletions(-)
 
 diff --git a/src/daemon.c b/src/daemon.c
-index b9631ee..a04e17c 100644
+index c476e55..ccfcab5 100644
 --- a/src/daemon.c
 +++ b/src/daemon.c
-@@ -578,6 +578,12 @@ main(int argc, char **argv) {
+@@ -579,6 +579,12 @@ main(int argc, char **argv) {
  
    parse_arg(argc, argv, &opt);
  
@@ -49,26 +49,26 @@ diff --git a/src/rs_worker.c b/src/rs_worker.c
 index f0faa8a..f3bf950 100644
 --- a/src/rs_worker.c
 +++ b/src/rs_worker.c
-@@ -15,6 +15,9 @@
- /*
+@@ -16,6 +16,9 @@
   * Prototypes
   */
-+static void
+ static void
 +hsk_rs_pending_log(hsk_rs_pending_t *pending, const char *fmt, ...);
 +
- static void
++static void
  hsk_rs_worker_log(hsk_rs_worker_t *ns, const char *fmt, ...);
  
-@@ -27,9 +30,6 @@ free_async(uv_async_t *async);
- static void
+ static uv_async_t *
+@@ -28,9 +31,6 @@ static void
  run_unbound_worker(void *arg);
  
--static void
+ static void
 -after_resolve_shutdown(void *data, int status, struct ub_result *result);
 -
- static void
+-static void
  after_resolve_onthread(void *data, int status, struct ub_result *result);
  
+ static void
 @@ -57,6 +57,11 @@ hsk_rs_queue_uninit(hsk_rs_queue_t *queue) {
    hsk_rs_rsp_t *current = queue->head;
    while (current) {
@@ -96,7 +96,7 @@ index f0faa8a..f3bf950 100644
    }
  
    uv_mutex_unlock(&queue->mutex);
-@@ -122,12 +130,181 @@ hsk_rs_queue_enqueue(hsk_rs_queue_t *queue, hsk_rs_rsp_t *rsp) {
+@@ -122,6 +130,7 @@ hsk_rs_queue_enqueue(hsk_rs_queue_t *queue, hsk_rs_rsp_t *rsp) {
    else {
      // There are requests queued already, add this one to the tail
      queue->tail->next = rsp;
@@ -104,10 +104,10 @@ index f0faa8a..f3bf950 100644
      queue->tail = rsp;
    }
  
-   uv_mutex_unlock(&queue->mutex);
+@@ -129,6 +138,174 @@ hsk_rs_queue_enqueue(hsk_rs_queue_t *queue, hsk_rs_rsp_t *rsp) {
  }
  
-+/*
+ /*
 + * Pending Requests
 + */
 +int
@@ -275,9 +275,10 @@ index f0faa8a..f3bf950 100644
 +  return ret;
 +}
 +
- /*
++/*
   * Response worker thread
   */
+ int
 @@ -138,11 +315,11 @@ hsk_rs_worker_init(hsk_rs_worker_t *worker, uv_loop_t *loop, void *stop_data,
      return HSK_EBADARGS;
  
@@ -388,7 +389,7 @@ index f0faa8a..f3bf950 100644
  }
  
  hsk_rs_worker_t *
-@@ -279,28 +450,47 @@ hsk_rs_worker_resolve(hsk_rs_worker_t *worker, char *name, int rrtype,
+@@ -279,29 +450,48 @@ hsk_rs_worker_resolve(hsk_rs_worker_t *worker, char *name, int rrtype,
      return HSK_EBADARGS;
  
    // Can't resolve when closing or not open
@@ -426,7 +427,7 @@ index f0faa8a..f3bf950 100644
    return HSK_SUCCESS;
  }
  
-+static void
+ static void
 +hsk_rs_pending_log(hsk_rs_pending_t *pending, const char *fmt, ...) {
 +  printf("rs_pending: ");
 +
@@ -436,9 +437,10 @@ index f0faa8a..f3bf950 100644
 +  va_end(args);
 +}
 +
- static void
++static void
  hsk_rs_worker_log(hsk_rs_worker_t *worker, const char *fmt, ...) {
    printf("rs_worker: ");
+ 
 @@ -344,27 +534,21 @@ static void
  run_unbound_worker(void *arg) {
    hsk_rs_worker_t *worker = (hsk_rs_worker_t *)arg;
@@ -610,5 +612,5 @@ index 9143856..d68afef 100644
  
  // Initialize with the libuv event loop where results are handled and the
 -- 
-2.17.1
+2.7.4
 
