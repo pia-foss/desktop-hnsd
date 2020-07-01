@@ -1,7 +1,7 @@
-From 56e5eeba1aff85d6c7e6c14a0c52c81163165e2e Mon Sep 17 00:00:00 2001
+From fb724ea092584531563739e84949d8d08b37db97 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Thu, 2 May 2019 16:40:00 -0400
-Subject: [PATCH 1/2] Skip libexpat requirement
+Subject: [PATCH 2/3] Skip libexpat requirement
 
 Skip libexpat; not needed when only building libunbound
 ---
@@ -9,10 +9,10 @@ Skip libexpat; not needed when only building libunbound
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index ff6f05ad..cd0803ec 100644
+index 3e00c99..0476e1e 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -1226,9 +1226,9 @@ for dir in $withval ; do
+@@ -1324,9 +1324,9 @@ for dir in $withval ; do
                  break;
              fi
  done
@@ -26,5 +26,5 @@ index ff6f05ad..cd0803ec 100644
  AC_CHECK_DECLS([XML_StopParser], [], [], [AC_INCLUDES_DEFAULT
  #include <expat.h>
 -- 
-2.23.0
+2.7.4
 

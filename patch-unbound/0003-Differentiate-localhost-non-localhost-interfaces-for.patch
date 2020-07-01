@@ -1,21 +1,21 @@
-From 7e31c6f33225ec369aa4c515f1293acfb1d0fa67 Mon Sep 17 00:00:00 2001
+From 41d926a585ca3f8a79e1a0fa10c8e55374c15891 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Thu, 19 Dec 2019 11:27:52 -0500
-Subject: [PATCH 2/2] Differentiate localhost / non-localhost interfaces for
+Subject: [PATCH 3/3] Differentiate localhost / non-localhost interfaces for
  IPv4 UDP sends
 
 ---
- services/outside_network.c | 83 +++++++++++++++++++++++++++++++++++---
- services/outside_network.h |  8 ++++
- util/net_help.c            | 14 +++++++
- util/net_help.h            |  8 ++++
+ services/outside_network.c | 83 +++++++++++++++++++++++++++++++++++++++++++---
+ services/outside_network.h |  8 +++++
+ util/net_help.c            | 14 ++++++++
+ util/net_help.h            |  8 +++++
  4 files changed, 108 insertions(+), 5 deletions(-)
 
 diff --git a/services/outside_network.c b/services/outside_network.c
-index 16d63df4..1df13dbb 100644
+index 80b1f12..fa0907d 100644
 --- a/services/outside_network.c
 +++ b/services/outside_network.c
-@@ -735,6 +735,23 @@ static int setup_if(struct port_if* pif, const char* addrstr,
+@@ -742,6 +742,23 @@ static int setup_if(struct port_if* pif, const char* addrstr,
  	return 1;
  }
  
@@ -39,7 +39,7 @@ index 16d63df4..1df13dbb 100644
  struct outside_network* 
  outside_network_create(struct comm_base *base, size_t bufsize, 
  	size_t num_ports, char** ifs, int num_ifs, int do_ip4, 
-@@ -842,6 +859,14 @@ outside_network_create(struct comm_base *base, size_t bufsize,
+@@ -849,6 +866,14 @@ outside_network_create(struct comm_base *base, size_t bufsize,
  			outside_network_delete(outnet);
  			return NULL;
  		}
@@ -54,7 +54,7 @@ index 16d63df4..1df13dbb 100644
  		if(do_ip6 && !setup_if(&outnet->ip6_ifs[0], "::", 
  			availports, numavailports, num_ports)) {
  			log_err("malloc failed");
-@@ -871,6 +896,39 @@ outside_network_create(struct comm_base *base, size_t bufsize,
+@@ -878,6 +903,39 @@ outside_network_create(struct comm_base *base, size_t bufsize,
  				done_4++;
  			}
  		}
@@ -94,7 +94,7 @@ index 16d63df4..1df13dbb 100644
  	}
  	return outnet;
  }
-@@ -1113,6 +1171,14 @@ static int
+@@ -1120,6 +1178,14 @@ static int
  select_ifport(struct outside_network* outnet, struct pending* pend,
  	int num_if, struct port_if* ifs)
  {
@@ -109,7 +109,7 @@ index 16d63df4..1df13dbb 100644
  	int my_if, my_port, fd, portno, inuse, tries=0;
  	struct port_if* pif;
  	/* randomly select interface and port */
-@@ -1195,11 +1261,18 @@ randomize_and_send_udp(struct pending* pend, sldns_buffer* packet, int timeout)
+@@ -1202,11 +1268,18 @@ randomize_and_send_udp(struct pending* pend, sldns_buffer* packet, int timeout)
  		if(!select_ifport(outnet, pend, 
  			outnet->num_ip6, outnet->ip6_ifs))
  			return 0;
@@ -134,7 +134,7 @@ index 16d63df4..1df13dbb 100644
  
  	/* send it over the commlink */
 diff --git a/services/outside_network.h b/services/outside_network.h
-index 48ef03ed..05a9db82 100644
+index 3456a3d..c8725e6 100644
 --- a/services/outside_network.h
 +++ b/services/outside_network.h
 @@ -117,6 +117,14 @@ struct outside_network {
@@ -153,10 +153,10 @@ index 48ef03ed..05a9db82 100644
  	struct pending* udp_wait_first;
  	/** last pending udp query in list */
 diff --git a/util/net_help.c b/util/net_help.c
-index 2b1be924..8458ceb8 100644
+index 0869f91..a21af11 100644
 --- a/util/net_help.c
 +++ b/util/net_help.c
-@@ -537,6 +537,20 @@ addr_is_ip6(struct sockaddr_storage* addr, socklen_t len)
+@@ -644,6 +644,20 @@ addr_is_ip6(struct sockaddr_storage* addr, socklen_t len)
  	else    return 0;
  }
  
@@ -178,14 +178,13 @@ index 2b1be924..8458ceb8 100644
  addr_mask(struct sockaddr_storage* addr, socklen_t len, int net)
  {
 diff --git a/util/net_help.h b/util/net_help.h
-index 0b197fbd..df708b3e 100644
+index 7a33a72..54cb873 100644
 --- a/util/net_help.h
 +++ b/util/net_help.h
-@@ -276,6 +276,14 @@ int sockaddr_cmp_addr(struct sockaddr_storage* addr1, socklen_t len1,
-  */
+@@ -277,6 +277,14 @@ int sockaddr_cmp_addr(struct sockaddr_storage* addr1, socklen_t len1,
  int addr_is_ip6(struct sockaddr_storage* addr, socklen_t len);
  
-+/**
+ /**
 + * Check if address is IPv4 localhost - 127.0.0.0/8
 + * @param addr: the sockaddr to examine.
 + * @param len: the length of addr.
@@ -193,9 +192,10 @@ index 0b197fbd..df708b3e 100644
 + */
 +int addr_is_ip4_localhost(struct sockaddr_storage* addr, socklen_t len);
 +
- /**
++/**
   * Make sure the sockaddr ends in zeroes. For tree insertion and subsequent
   * comparison.
+  * @param addr: the ip4 or ip6 addr.
 -- 
-2.23.0
+2.7.4
 

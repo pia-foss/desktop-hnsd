@@ -1,7 +1,7 @@
-From 4ffcde8abc3f5caf077c2120e7241a1eb98e9cf1 Mon Sep 17 00:00:00 2001
+From 675ea57910daf65376b35f6d83353d907e8b39cb Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 20 Dec 2019 09:34:28 -0500
-Subject: [PATCH 14/14] Add outgoing-dns-ifs command-line argument
+Subject: [PATCH 2/2] Add outgoing-dns-ifs command-line argument
 
 ---
  src/daemon.c | 19 +++++++++++++++++--

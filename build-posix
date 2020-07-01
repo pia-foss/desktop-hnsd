@@ -97,10 +97,10 @@ prep_submodule hnsd
 
 echo "Building OpenSSL..."
 pushd "${build_dir}/openssl"
-./Configure $openssl_platform
+./Configure $openssl_platform --prefix="${output_dir}/openssl"
 make -j2
 # The install_sw target skips man pages
-make INSTALL_PREFIX="${output_dir}/openssl" install_sw
+make install_sw
 popd
 
 echo "Building Unbound..."
@@ -114,7 +114,7 @@ autoconf
 # - Always install to /usr/local prefix (default is different on MinGW)
 # shellcheck disable=SC2086
 # ^ Intentional wordsplitting of ${unbound_platform_cfgargs}
-./configure --with-ssl="${output_dir}/openssl/usr/local/ssl" --with-libunbound-only --disable-shared --enable-static ${unbound_platform_cfgargs} --prefix="${output_dir}/unbound" --disable-flto
+./configure --with-ssl="${output_dir}/openssl" --disable-shared --enable-static ${unbound_platform_cfgargs} --prefix="${output_dir}/unbound" --disable-flto
 make -j2
 make install
 popd
@@ -128,27 +128,51 @@ pushd "${build_dir}/hnsd"
 ./configure --with-network=testnet --with-unbound="${output_dir}/unbound"
 make -j2
 
+# Copy unbound to artifacts
+cp "${build_dir}/unbound/unbound" "${artifacts_dir}/pia-unbound"
 # Copy hnsd to artifacts
 cp "${build_dir}/hnsd/hnsd" "${artifacts_dir}/pia-hnsd"
 
 function strip_symbols() {
-    local EXT=$1
+    local ARTIFACT=$1
+    local EXT=$2
 
     # Strip debugging symbols from hnsd, but keep a full copy in case it's
     # needed for debugging
-    cp "${artifacts_dir}/pia-hnsd${EXT}" "${artifacts_dir}/pia-hnsd.full${EXT}"
-    strip --strip-debug "${artifacts_dir}/pia-hnsd${EXT}"
-    objcopy --add-gnu-debuglink="${artifacts_dir}/pia-hnsd.full${EXT}" "${artifacts_dir}/pia-hnsd${EXT}"
+    cp "${artifacts_dir}/${ARTIFACT}${EXT}" "${artifacts_dir}/${ARTIFACT}.full${EXT}"
+    strip --strip-debug "${artifacts_dir}/${ARTIFACT}${EXT}"
+    objcopy --add-gnu-debuglink="${artifacts_dir}/${ARTIFACT}.full${EXT}" "${artifacts_dir}/${ARTIFACT}${EXT}"
+}
+
+function mac_set_loader_path() {
+   local LIBNAME=$1
+   local TARGET=$2
+
+   local LIBPATH="$(otool -L "$TARGET" | sed -E $'s|^[ \t]*([^ \t].*/'"$LIBNAME"$').*$|\\1|' | grep "$LIBNAME")"
+   install_name_tool -change "$LIBPATH" "@loader_path/$LIBNAME" "$TARGET"
 }
 
 case $platform in
     linux*)
-        strip_symbols
+        # OpenSSL is dynamically linked.  We ship the dynamic libraries built from the desktop-openvpn repo,
+        # but the rpaths in these binaries need to be set.
+        patchelf --force-rpath --set-rpath '$ORIGIN/../lib' "${artifacts_dir}/pia-unbound"
+        patchelf --force-rpath --set-rpath '$ORIGIN/../lib' "${artifacts_dir}/pia-hnsd"
+
+        strip_symbols pia-hnsd ""
+        strip_symbols pia-unbound ""
         ;;
     mingw*)
-        strip_symbols ".exe"
+        strip_symbols pia-hnsd .exe
+        strip_symbols pia-unbound .exe
         ;;
     macos)
+        # Like on Linux, OpenSSL is dynamically linked - we ship dylibs from desktop-openvpn, but set the
+        # library paths.
+        mac_set_loader_path libssl.1.1.dylib "${artifacts_dir}/pia-unbound"
+        mac_set_loader_path libcrypto.1.1.dylib "${artifacts_dir}/pia-unbound"
+        mac_set_loader_path libssl.1.1.dylib "${artifacts_dir}/pia-hnsd"
+        mac_set_loader_path libcrypto.1.1.dylib "${artifacts_dir}/pia-hnsd"
         ;;
 esac
 
